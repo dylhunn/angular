@@ -273,6 +273,9 @@
     "name": "NoneEncapsulationDomRenderer"
   },
   {
+    "name": "NoopNgZone"
+  },
+  {
     "name": "NullInjector"
   },
   {
@@ -498,9 +501,6 @@
     "name": "createElementRef"
   },
   {
-    "name": "createEnvironmentInjector"
-  },
-  {
     "name": "createInjector"
   },
   {
@@ -631,6 +631,12 @@
   },
   {
     "name": "getNextLContainer"
+  },
+  {
+    "name": "getNgZone"
+  },
+  {
+    "name": "getNgZoneOptions"
   },
   {
     "name": "getNodeInjectable"

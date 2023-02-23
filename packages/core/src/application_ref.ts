@@ -8,6 +8,7 @@
 
 import './util/ng_jit_mode';
 
+import {ClassProvider, InjectFlags, TypeProvider, ValueProvider} from '@angular/core';
 import {merge, Observable, Observer, Subscription} from 'rxjs';
 import {share} from 'rxjs/operators';
 
@@ -15,6 +16,7 @@ import {ApplicationInitStatus} from './application_init';
 import {APP_BOOTSTRAP_LISTENER, PLATFORM_INITIALIZER} from './application_tokens';
 import {getCompilerFacade, JitCompilerUsage} from './compiler/compiler_facade';
 import {Console} from './console';
+import {makeEnvironmentProviders} from './di';
 import {Injectable} from './di/injectable';
 import {InjectionToken} from './di/injection_token';
 import {Injector} from './di/injector';
@@ -38,9 +40,10 @@ import {isStandalone} from './render3/definition';
 import {assertStandaloneComponentType} from './render3/errors';
 import {setLocaleId} from './render3/i18n/i18n_locale_id';
 import {setJitOptions} from './render3/jit/jit_options';
-import {createEnvironmentInjector, NgModuleFactory as R3NgModuleFactory} from './render3/ng_module_ref';
+import {createEnvironmentInjector, EnvironmentNgModuleRefAdapter, NgModuleFactory as R3NgModuleFactory} from './render3/ng_module_ref';
 import {publishDefaultGlobalUtils as _publishDefaultGlobalUtils} from './render3/util/global_utils';
 import {TESTABILITY} from './testability/testability';
+import {flatten} from './util/array_utils';
 import {isPromise} from './util/lang';
 import {scheduleMicroTask} from './util/microtask';
 import {stringify} from './util/stringify';
@@ -198,20 +201,28 @@ export function internalCreateApplication(config: {
     assertStandaloneComponentType(rootComponent);
   }
 
+  // Create root application injector based on a set of providers configured at the platform
+  // bootstrap level as well as providers passed to the bootstrap call by a user.
   const platformInjector = createOrReusePlatformInjector(platformProviders as StaticProvider[]);
 
-  const ngZone = getNgZone('zone.js', getNgZoneOptions());
+  const allAppProviders = [
+    // We provide ZoneJS by default at the moment. At some point this will become
+    // `{provide: NgZone, useValue: new NoopNgZone()}` by default and the user-provided zone can
+    // override this.
+    {provide: NgZone, useValue: new NgZone({})},
+    ...(appProviders || []),
+  ];
 
+  const environmentNgModuleRefAdapter = new EnvironmentNgModuleRefAdapter(allAppProviders, {
+    parent: platformInjector as EnvironmentInjector,
+    source: 'Environment Injector',
+    runEnvironmentInitializers: false
+  });
+  const envInjector = environmentNgModuleRefAdapter.injector;
+
+  const ngZone = envInjector.get(NgZone);
   return ngZone.run(() => {
-    // Create root application injector based on a set of providers configured at the platform
-    // bootstrap level as well as providers passed to the bootstrap call by a user.
-    const allAppProviders = [
-      {provide: NgZone, useValue: ngZone},  //
-      ...(appProviders || []),              //
-    ];
-
-    const envInjector = createEnvironmentInjector(
-        allAppProviders, platformInjector as EnvironmentInjector, 'Environment Injector');
+    environmentNgModuleRefAdapter.injector.resolveInjectorInitializers();
 
     const exceptionHandler: ErrorHandler|null = envInjector.get(ErrorHandler, null);
     if (NG_DEV_MODE && !exceptionHandler) {
@@ -583,15 +594,15 @@ function getNgZoneOptions(options?: BootstrapOptions): NgZoneOptions {
   };
 }
 
-function getNgZone(ngZoneToUse: NgZone|'zone.js'|'noop'|undefined, options: NgZoneOptions): NgZone {
-  let ngZone: NgZone;
-
+function getNgZone(
+    ngZoneToUse: NgZone|'zone.js'|'noop' = 'zone.js', options: NgZoneOptions): NgZone {
   if (ngZoneToUse === 'noop') {
-    ngZone = new NoopNgZone();
+    return new NoopNgZone();
+  } else if (ngZoneToUse === 'zone.js') {
+    return new NgZone(options);
   } else {
-    ngZone = (ngZoneToUse === 'zone.js' ? undefined : ngZoneToUse) || new NgZone(options);
+    return ngZoneToUse;
   }
-  return ngZone;
 }
 
 function _callAndReportToErrorHandler(

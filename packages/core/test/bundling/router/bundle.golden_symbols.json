@@ -480,6 +480,9 @@
     "name": "NoneEncapsulationDomRenderer"
   },
   {
+    "name": "NoopNgZone"
+  },
+  {
     "name": "NullInjector"
   },
   {
@@ -1272,6 +1275,12 @@
     "name": "getNgModuleDef"
   },
   {
+    "name": "getNgZone"
+  },
+  {
+    "name": "getNgZoneOptions"
+  },
+  {
     "name": "getNodeInjectable"
   },
   {
@@ -1591,6 +1600,9 @@
   },
   {
     "name": "lookupTokenUsingNodeInjector"
+  },
+  {
+    "name": "makeEnvironmentProviders"
   },
   {
     "name": "makeRecord"

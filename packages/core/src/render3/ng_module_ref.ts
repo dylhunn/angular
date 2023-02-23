@@ -15,6 +15,7 @@ import {ComponentFactoryResolver as viewEngine_ComponentFactoryResolver} from '.
 import {InternalNgModuleRef, NgModuleFactory as viewEngine_NgModuleFactory, NgModuleRef as viewEngine_NgModuleRef} from '../linker/ng_module_factory';
 import {assertDefined} from '../util/assert';
 import {stringify} from '../util/stringify';
+import {NoopNgZone} from '../zone/ng_zone';
 
 import {ComponentFactoryResolver} from './component_ref';
 import {getNgModuleDef} from './definition';
@@ -112,15 +113,21 @@ export class NgModuleFactory<T> extends viewEngine_NgModuleFactory<T> {
   }
 }
 
-class EnvironmentNgModuleRefAdapter extends viewEngine_NgModuleRef<null> {
-  override readonly injector: EnvironmentInjector;
+declare interface NgModuleRefInitializationOptions {
+  parent: EnvironmentInjector|null;
+  source: string|null;
+  runEnvironmentInitializers: boolean;
+}
+
+export class EnvironmentNgModuleRefAdapter extends viewEngine_NgModuleRef<null> {
+  override readonly injector: R3Injector;
   override readonly componentFactoryResolver: ComponentFactoryResolver =
       new ComponentFactoryResolver(this);
   override readonly instance = null;
+  readonly deferredInjectorInitializersResolvers: (() => void)|null = null;
 
   constructor(
-      providers: Array<Provider|EnvironmentProviders>, parent: EnvironmentInjector|null,
-      source: string|null) {
+      providers: Array<Provider|EnvironmentProviders>, options: NgModuleRefInitializationOptions) {
     super();
     const injector = new R3Injector(
         [
@@ -128,9 +135,12 @@ class EnvironmentNgModuleRefAdapter extends viewEngine_NgModuleRef<null> {
           {provide: viewEngine_NgModuleRef, useValue: this},
           {provide: viewEngine_ComponentFactoryResolver, useValue: this.componentFactoryResolver},
         ],
-        parent || getNullInjector(), source, new Set(['environment']));
+        options.parent || getNullInjector(), options.source, new Set(['environment']));
     this.injector = injector;
-    injector.resolveInjectorInitializers();
+
+    if (options.runEnvironmentInitializers) {
+      injector.resolveInjectorInitializers();
+    }
   }
 
   override destroy(): void {
@@ -158,6 +168,7 @@ class EnvironmentNgModuleRefAdapter extends viewEngine_NgModuleRef<null> {
 export function createEnvironmentInjector(
     providers: Array<Provider|EnvironmentProviders>, parent: EnvironmentInjector,
     debugName: string|null = null): EnvironmentInjector {
-  const adapter = new EnvironmentNgModuleRefAdapter(providers, parent, debugName);
+  const adapter = new EnvironmentNgModuleRefAdapter(
+      providers, {parent, source: debugName, runEnvironmentInitializers: true});
   return adapter.injector;
 }
