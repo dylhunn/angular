@@ -108,7 +108,7 @@ function getTheBoundEventAtPosition(templateInfo: TemplateInfo, start: number): 
 /**
  * Flip the invalid "box in a banana" `([thing])` to the correct "banana in a box" `[(thing)]`.
  */
-function convertBoundEventToTsTextChange(node: BoundEvent): readonly tss.TextChange[] {
+function convertBoundEventToTsTextChange(node: TmplAstBoundEvent): readonly tss.TextChange[] {
   const name = node.name;
   const boundSyntax = node.sourceSpan.toString();
   const expectedBoundSyntax = boundSyntax.replace(`(${name})`, `[(${name.slice(1, -1)})]`);
